@@ -62,7 +62,15 @@ public class BlackjackProviderAgent extends Agent {
         dealerSum = new Random().nextInt(10) + 2;
         gameActive = true;
 
-        // Роздача карт (Об'єкт CardsDealt)
+        // 1. ВІДПРАВЛЯЄМО ТЕКСТ ПЕРШИМ (це точно має з'явитися в лозі)
+        sendTextReply(msg, "GAME_START:Blackjack");
+        sendTextReply(msg, "DECK_COUNT:52");
+        sendTextReply(msg, "WELCOME! Dealer shows: " + dealerSum);
+
+        // Вивід в консоль IntelliJ для перевірки
+        System.out.println(">>> Blackjack started. Dealer score: " + dealerSum);
+
+        // 2. А ТЕПЕР ВІДПРАВЛЯЄМО КАРТИ
         ACLMessage replyCards = msg.createReply();
         replyCards.setPerformative(ACLMessage.INFORM);
         CardsDealt cd = new CardsDealt();
@@ -72,29 +80,34 @@ public class BlackjackProviderAgent extends Agent {
         try {
             getContentManager().fillContent(replyCards, cd);
             send(replyCards);
-        } catch (Exception e) { e.printStackTrace(); }
-
-        // Текстові налаштування (ВАЖЛИВО: БЕЗ ПРОБІЛІВ ПІСЛЯ ДВОКРАПКИ для надійності)
-        sendTextReply(msg, "GAME_START:Blackjack");
-        sendTextReply(msg, "DECK_COUNT:52");
-        sendTextReply(msg, "Dealer shows: " + dealerSum + ". HIT by clicking card or STAND by pressing TAKE.");
+        } catch (Exception e) {
+            System.err.println("Ontology error while dealing: " + e.getMessage());
+        }
     }
 
     private void handleHit(PlayMove action, ACLMessage msg) {
         if (!gameActive) return;
 
         Card c = action.getPlayedCard();
-        int val = parseRank(c.getRank());
-        playerSum += val;
+        playerSum += parseRank(c.getRank());
 
-        // Відобразити карту на столі
+        // 1. Показуємо карту на столі
         sendTextReply(msg, "SHOW_ATTACK:" + c.getRank() + ":" + c.getSuit());
+        sendTextReply(msg, "Current Sum: " + playerSum);
 
         if (playerSum > 21) {
             gameActive = false;
-            sendTextReply(msg, "BUST! Sum: " + playerSum + ". GAME_OVER:SERVER_WINS");
+            sendTextReply(msg, "BUST! (Перебір). GAME_OVER:SERVER_WINS");
         } else {
-            sendTextReply(msg, "Sum: " + playerSum + ". Hit again or Stand?");
+            // 2. ДАЄМО ГРАВЦЮ НОВУ КАРТУ В РУКУ (щоб було що підбирати далі)
+            ACLMessage replyCard = msg.createReply();
+            replyCard.setPerformative(ACLMessage.INFORM);
+            CardsDealt cd = new CardsDealt();
+            cd.getCards().add(generateRandomCard()); // Додаємо одну нову карту
+            try {
+                getContentManager().fillContent(replyCard, cd);
+                send(replyCard);
+            } catch (Exception e) {}
         }
     }
 
