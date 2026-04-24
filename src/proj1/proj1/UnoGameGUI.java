@@ -2,6 +2,7 @@ package proj1.proj1;
 
 import javax.swing.*;
 import javax.swing.border.EmptyBorder;
+import javax.swing.border.TitledBorder;
 import java.awt.*;
 
 public class UnoGameGUI extends JFrame {
@@ -11,11 +12,11 @@ public class UnoGameGUI extends JFrame {
     public JButton drawButton = new JButton("DRAW CARD");
     public JButton exitButton = new JButton("EXIT GAME");
 
-    private JLabel statusLabel = new JLabel("UNO game");
+    private JLabel statusLabel = new JLabel("UNO started");
     private JLabel deckLabel = new JLabel("Deck: ?");
     private JLabel titleLabel = new JLabel("UNO");
 
-    private UserAgent agent;
+    private final UserAgent agent;
 
     public UnoGameGUI(UserAgent agent) {
         this.agent = agent;
@@ -49,14 +50,7 @@ public class UnoGameGUI extends JFrame {
 
         tablePanel.setLayout(new FlowLayout(FlowLayout.CENTER, 25, 25));
         tablePanel.setOpaque(false);
-        tablePanel.setBorder(BorderFactory.createTitledBorder(
-                BorderFactory.createLineBorder(Color.WHITE, 2),
-                "TABLE",
-                0,
-                0,
-                new Font("Arial", Font.BOLD, 16),
-                Color.WHITE
-        ));
+        tablePanel.setBorder(makeBorder("TOP CARD"));
 
         handPanel.setLayout(new FlowLayout(FlowLayout.LEFT, 15, 15));
         handPanel.setOpaque(false);
@@ -65,27 +59,12 @@ public class UnoGameGUI extends JFrame {
         handScroll.setPreferredSize(new Dimension(0, 200));
         handScroll.setOpaque(false);
         handScroll.getViewport().setOpaque(false);
-        handScroll.setBorder(BorderFactory.createTitledBorder(
-                BorderFactory.createLineBorder(Color.WHITE, 2),
-                "YOUR HAND",
-                0,
-                0,
-                new Font("Arial", Font.BOLD, 16),
-                Color.WHITE
-        ));
+        handScroll.setBorder(makeBorder("YOUR HAND"));
 
-        drawButton.setFont(new Font("Arial", Font.BOLD, 16));
-        drawButton.setForeground(Color.WHITE);
-        drawButton.setBackground(new Color(30, 30, 30));
-        drawButton.setFocusPainted(false);
-        drawButton.setBorder(BorderFactory.createLineBorder(Color.WHITE, 2));
+        setupButton(drawButton, new Color(30, 30, 30));
+        setupButton(exitButton, new Color(120, 0, 0));
+
         drawButton.addActionListener(e -> agent.sendUnoDrawRequest());
-
-        exitButton.setFont(new Font("Arial", Font.BOLD, 16));
-        exitButton.setForeground(Color.WHITE);
-        exitButton.setBackground(new Color(120, 0, 0));
-        exitButton.setFocusPainted(false);
-        exitButton.setBorder(BorderFactory.createLineBorder(Color.WHITE, 2));
         exitButton.addActionListener(e -> agent.exitCurrentGame());
 
         JPanel buttonPanel = new JPanel(new GridLayout(2, 1, 10, 10));
@@ -101,6 +80,25 @@ public class UnoGameGUI extends JFrame {
 
         add(main);
         setLocationRelativeTo(null);
+    }
+
+    private void setupButton(JButton button, Color bg) {
+        button.setFont(new Font("Arial", Font.BOLD, 16));
+        button.setForeground(Color.WHITE);
+        button.setBackground(bg);
+        button.setFocusPainted(false);
+        button.setBorder(BorderFactory.createLineBorder(Color.WHITE, 2));
+    }
+
+    private TitledBorder makeBorder(String title) {
+        return BorderFactory.createTitledBorder(
+                BorderFactory.createLineBorder(Color.WHITE, 2),
+                title,
+                0,
+                0,
+                new Font("Arial", Font.BOLD, 16),
+                Color.WHITE
+        );
     }
 
     public void addCardToHand(String rank, String suit) {
@@ -130,6 +128,7 @@ public class UnoGameGUI extends JFrame {
 
     public void setStatus(String text) {
         SwingUtilities.invokeLater(() -> statusLabel.setText(text));
+        System.out.println("UNO LOG: " + text);
     }
 
     public void setDeck(int count) {
@@ -139,11 +138,9 @@ public class UnoGameGUI extends JFrame {
     public void showGameOver(String text, Color color) {
         SwingUtilities.invokeLater(() -> {
             tablePanel.removeAll();
-
             JLabel label = new JLabel(text);
             label.setFont(new Font("Arial", Font.BOLD, 52));
             label.setForeground(color);
-
             tablePanel.add(label);
             tablePanel.revalidate();
             tablePanel.repaint();
@@ -154,30 +151,53 @@ public class UnoGameGUI extends JFrame {
         @Override
         protected void paintComponent(Graphics g) {
             super.paintComponent(g);
-
             Graphics2D g2 = (Graphics2D) g;
             int w = getWidth();
             int h = getHeight();
-
-            GradientPaint gp = new GradientPaint(
-                    0, 0, new Color(0, 0, 0),
-                    w, h, new Color(80, 0, 120)
-            );
-
+            GradientPaint gp = new GradientPaint(0, 0, Color.BLACK, w, h, new Color(80, 0, 120));
             g2.setPaint(gp);
             g2.fillRect(0, 0, w, h);
-
             g2.setColor(new Color(255, 0, 0, 60));
             g2.fillOval(w - 260, 60, 230, 230);
-
             g2.setColor(new Color(0, 120, 255, 55));
             g2.fillOval(60, h - 250, 260, 260);
-
             g2.setColor(new Color(0, 255, 100, 40));
             g2.fillOval(w - 360, h - 270, 300, 300);
-
             g2.setColor(new Color(255, 255, 255, 25));
             g2.fillOval(-130, -130, 310, 310);
         }
+    }
+    public void showPlayerThenDealerCard(String playerRank, String playerSuit,
+                                         String dealerRank, String dealerSuit) {
+        SwingUtilities.invokeLater(() -> {
+            tablePanel.removeAll();
+
+            JLabel playerLabel = new JLabel("You played:");
+            playerLabel.setForeground(Color.WHITE);
+            playerLabel.setFont(new Font("Arial", Font.BOLD, 18));
+
+            tablePanel.add(playerLabel);
+            tablePanel.add(new VisualCard(playerRank, playerSuit, null));
+
+            tablePanel.revalidate();
+            tablePanel.repaint();
+
+            Timer timer = new Timer(2000, e -> {
+                tablePanel.removeAll();
+
+                JLabel dealerLabel = new JLabel("Dealer played:");
+                dealerLabel.setForeground(Color.WHITE);
+                dealerLabel.setFont(new Font("Arial", Font.BOLD, 18));
+
+                tablePanel.add(dealerLabel);
+                tablePanel.add(new VisualCard(dealerRank, dealerSuit, null));
+
+                tablePanel.revalidate();
+                tablePanel.repaint();
+            });
+
+            timer.setRepeats(false);
+            timer.start();
+        });
     }
 }

@@ -35,6 +35,7 @@ public class UnoProviderAgent extends Agent {
     private void handleMessage(ACLMessage msg) {
         if ("UNO_DRAW".equals(msg.getContent())) {
             giveCards(msg.getSender(), 1);
+            sendText(msg.getSender(), "UNO_STATUS:You drew one card");
             return;
         }
 
@@ -49,8 +50,8 @@ public class UnoProviderAgent extends Agent {
                 }
 
                 if (action instanceof PlayMove) {
-                    Card c = ((PlayMove) action).getPlayedCard();
-                    playCard(msg.getSender(), c);
+                    Card card = ((PlayMove) action).getPlayedCard();
+                    playCard(msg.getSender(), card);
                 }
             }
         } catch (Exception e) {
@@ -67,9 +68,14 @@ public class UnoProviderAgent extends Agent {
             Card p = drawCard();
             Card b = drawCard();
 
-            cards.addCards(p);
-            botHand.add(b);
-            playerCount++;
+            if (p != null) {
+                cards.addCards(p);
+                playerCount++;
+            }
+
+            if (b != null) {
+                botHand.add(b);
+            }
         }
 
         topCard = drawCard();
@@ -80,27 +86,42 @@ public class UnoProviderAgent extends Agent {
         sendText(player, "UNO_DECK:" + deck.size());
     }
 
-    private void playCard(AID player, Card card) {
-        if (!canPlay(card)) {
-            sendText(player, "UNO_RETURN:" + card.getRank() + ":" + card.getSuit());
+    private void playCard(AID player, Card playerCard) {
+        if (!canPlay(playerCard)) {
+            sendText(player, "UNO_RETURN:" + playerCard.getRank() + ":" + playerCard.getSuit());
             sendText(player, "UNO_STATUS:Wrong card");
             return;
         }
 
-        topCard = card;
+        topCard = playerCard;
         playerCount--;
 
-        sendText(player, "UNO_TOP:" + topCard.getRank() + ":" + topCard.getSuit());
-
-        if (playerCount == 0) {
-            sendText(player, "UNO_STATUS:YOU WIN");
+        if (playerCount <= 0) {
+            sendText(player, "UNO_TOP:" + topCard.getRank() + ":" + topCard.getSuit());
+            sendText(player, "UNO_GAME_OVER:YOU WIN");
             return;
         }
 
-        botMove(player);
+        if (playerCard.getRank().equals("+2")) {
+            botDrawCards(2);
+            sendText(player, "UNO_TOP:" + topCard.getRank() + ":" + topCard.getSuit());
+            sendText(player, "UNO_STATUS:You played +2. Dealer draws 2. Your turn again.");
+            sendText(player, "UNO_DECK:" + deck.size());
+            return;
+        }
+
+        if (playerCard.getRank().equals("+4")) {
+            botDrawCards(4);
+            sendText(player, "UNO_TOP:" + topCard.getRank() + ":" + topCard.getSuit());
+            sendText(player, "UNO_STATUS:You played +4. Dealer draws 4. Your turn again.");
+            sendText(player, "UNO_DECK:" + deck.size());
+            return;
+        }
+
+        botMove(player, playerCard);
     }
 
-    private void botMove(AID player) {
+    private void botMove(AID player, Card playerCard) {
         Card chosen = null;
 
         for (Card c : botHand) {
@@ -110,21 +131,55 @@ public class UnoProviderAgent extends Agent {
             }
         }
 
-        if (chosen != null) {
-            botHand.remove(chosen);
-            topCard = chosen;
-            sendText(player, "UNO_TOP:" + topCard.getRank() + ":" + topCard.getSuit());
-            sendText(player, "UNO_STATUS:Bot played");
+        if (chosen == null) {
+            Card drawn = drawCard();
+
+            if (drawn != null) {
+                botHand.add(drawn);
+
+                if (canPlay(drawn)) {
+                    chosen = drawn;
+                }
+            }
+        }
+
+        if (chosen == null) {
+            sendText(player, "UNO_TOP:" + playerCard.getRank() + ":" + playerCard.getSuit());
+            sendText(player, "UNO_STATUS:Dealer drew card. Your turn");
+            sendText(player, "UNO_DECK:" + deck.size());
+            return;
+        }
+
+        botHand.remove(chosen);
+        topCard = chosen;
+
+        sendText(player, "UNO_SEQUENCE:"
+                + playerCard.getRank() + ":" + playerCard.getSuit()
+                + ":" + chosen.getRank() + ":" + chosen.getSuit());
+
+        if (botHand.isEmpty()) {
+            sendText(player, "UNO_GAME_OVER:DEALER WINS");
+            return;
+        }
+
+        if (chosen.getRank().equals("+2")) {
+            giveCards(player, 2);
+            sendText(player, "UNO_STATUS:Dealer played +2. You draw 2.");
+        } else if (chosen.getRank().equals("+4")) {
+            giveCards(player, 4);
+            sendText(player, "UNO_STATUS:Dealer played +4. You draw 4.");
         } else {
-            Card d = drawCard();
-            if (d != null) botHand.add(d);
-            sendText(player, "UNO_STATUS:Bot drew card");
+            sendText(player, "UNO_STATUS:Dealer played " + chosen.getRank() + " " + chosen.getSuit());
         }
 
         sendText(player, "UNO_DECK:" + deck.size());
     }
 
     private boolean canPlay(Card c) {
+        if (c == null || topCard == null) return false;
+
+        if (c.getRank().equals("+4")) return true;
+
         return c.getSuit().equals(topCard.getSuit())
                 || c.getRank().equals(topCard.getRank());
     }
@@ -134,6 +189,7 @@ public class UnoProviderAgent extends Agent {
 
         for (int i = 0; i < count; i++) {
             Card c = drawCard();
+
             if (c != null) {
                 cards.addCards(c);
                 playerCount++;
@@ -144,24 +200,47 @@ public class UnoProviderAgent extends Agent {
         sendText(player, "UNO_DECK:" + deck.size());
     }
 
+    private void botDrawCards(int count) {
+        for (int i = 0; i < count; i++) {
+            Card c = drawCard();
+            if (c != null) botHand.add(c);
+        }
+    }
+
     private void initDeck() {
         deck.clear();
         botHand.clear();
         playerCount = 0;
 
         String[] colors = {"Red", "Yellow", "Green", "Blue"};
-        String[] ranks = {"0","1","2","3","4","5","6","7","8","9","+2","Skip"};
+        String[] normalRanks = {"0", "1", "2", "3", "4", "5", "6", "7", "8", "9"};
 
         for (String color : colors) {
-            for (String rank : ranks) {
-                Card c = new Card();
-                c.setRank(rank);
-                c.setSuit(color);
-                deck.add(c);
+            for (String rank : normalRanks) {
+                addCard(rank, color);
+                addCard(rank, color);
             }
+
+            addCard("+2", color);
+            addCard("+2", color);
+
+            addCard("Skip", color);
+            addCard("Skip", color);
         }
 
+        addCard("+4", "Black");
+        addCard("+4", "Black");
+        addCard("+4", "Black");
+        addCard("+4", "Black");
+
         Collections.shuffle(deck);
+    }
+
+    private void addCard(String rank, String suit) {
+        Card c = new Card();
+        c.setRank(rank);
+        c.setSuit(suit);
+        deck.add(c);
     }
 
     private Card drawCard() {
