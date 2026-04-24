@@ -59,18 +59,20 @@ public class UserAgentGUI extends JFrame {
         turnLabel.setForeground(Color.YELLOW);
         turnLabel.setFont(new Font("Arial", Font.BOLD, 16));
 
+        // INITIAL STATE: Hide info until a game starts
+        trumpLabel.setVisible(false);
+        deckLabel.setVisible(false);
+        turnLabel.setVisible(false);
+
         infoPanel.add(trumpLabel);
         infoPanel.add(deckLabel);
         infoPanel.add(turnLabel);
 
-        // Use a wrapper to push infoPanel to the Top-Right
         JPanel rightAligner = new JPanel(new BorderLayout());
         rightAligner.setOpaque(false);
         rightAligner.add(infoPanel, BorderLayout.EAST);
-
         battlefieldContainer.add(rightAligner, BorderLayout.NORTH);
 
-        // Center Area for Cards
         battlefieldPanel.setLayout(new FlowLayout(FlowLayout.CENTER, 20, 20));
         battlefieldPanel.setOpaque(false);
         battlefieldContainer.add(battlefieldPanel, BorderLayout.CENTER);
@@ -85,15 +87,13 @@ public class UserAgentGUI extends JFrame {
         handBorder.setTitleColor(Color.WHITE);
         handScrollPane.setBorder(handBorder);
 
-        // Button Row
         JPanel buttonPanel = new JPanel(new GridLayout(1, 3, 10, 10));
         buttonPanel.setPreferredSize(new Dimension(0, 50));
         buttonPanel.add(refreshButton);
         buttonPanel.add(joinButton);
         buttonPanel.add(doneButton);
-        doneButton.setVisible(false); // Hidden until in game
+        doneButton.setVisible(false);
 
-        // Final Layout Assembly
         JPanel centerArea = new JPanel(new BorderLayout());
         centerArea.add(battlefieldContainer, BorderLayout.CENTER);
 
@@ -111,13 +111,26 @@ public class UserAgentGUI extends JFrame {
     public void setInGameUI(boolean inGame) {
         SwingUtilities.invokeLater(() -> {
             if (inGame) {
+                // Settings for Durak game specifically
+                trumpLabel.setVisible(true);
+                deckLabel.setVisible(true);
+                turnLabel.setVisible(true);
+                turnLabel.setForeground(Color.YELLOW);
                 refreshButton.setText("✋ TAKE CARDS");
                 joinButton.setEnabled(false);
                 doneButton.setVisible(true);
             } else {
+                // RESET TO MAIN MENU
                 refreshButton.setText("🔍 SCAN FOR LOBBIES");
                 joinButton.setEnabled(true);
+                joinButton.setText("🚪 JOIN SELECTED GAME");
                 doneButton.setVisible(false);
+
+                // Hide labels completely until next game
+                trumpLabel.setVisible(false);
+                deckLabel.setVisible(false);
+                turnLabel.setVisible(false);
+
                 clearTable();
                 clearHand();
             }
@@ -127,15 +140,22 @@ public class UserAgentGUI extends JFrame {
     }
 
     public void setTrumpUI(String suit, String icon) {
-        SwingUtilities.invokeLater(() -> trumpLabel.setText("Trump: " + icon + " " + suit));
+        SwingUtilities.invokeLater(() -> {
+            trumpLabel.setText("Trump: " + icon + " " + suit);
+            trumpLabel.setVisible(true);
+        });
     }
 
     public void setDeckUI(int count) {
-        SwingUtilities.invokeLater(() -> deckLabel.setText("Deck: " + count));
+        SwingUtilities.invokeLater(() -> {
+            deckLabel.setText("Deck: " + count);
+            deckLabel.setVisible(true);
+        });
     }
 
     public void setTurnUI(boolean myTurn) {
         SwingUtilities.invokeLater(() -> {
+            turnLabel.setVisible(true);
             if (myTurn) {
                 turnLabel.setText("TURN: ATTACK");
                 turnLabel.setForeground(Color.GREEN);
@@ -170,7 +190,6 @@ public class UserAgentGUI extends JFrame {
         });
     }
 
-    // Kept for logic compatibility but no longer updates UI
     public void updateLog(String msg) {
         System.out.println("LOG: " + msg);
     }
